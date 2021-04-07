@@ -1,0 +1,26 @@
+<ehcache xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="ehcache.xsd"
+    updateCheck="true"
+    monitoring="autodetect"
+    dynamicConfig="true">
+ 
+    <diskStore path="E:\\CrmCache" />
+
+     
+    <cache name="countryCache"
+    		maxElementsInMemory="10000"
+           	eternal="false"
+           	timeToIdleSeconds="1800"
+           	timeToLiveSeconds="3600"
+           	memoryStoreEvictionPolicy="LFU"
+           	overflowToDisk="true"
+           	maxElementsOnDisk="10000000"
+           	diskPersistent="false"
+           	diskExpiryThreadIntervalSeconds="120"
+        	maxEntriesLocalHeap="100"
+        	maxEntriesLocalDisk="1000"
+        	transactionalMode="off">
+    </cache>
+    
+ 
+</ehcache>

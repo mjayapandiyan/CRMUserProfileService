@@ -1,0 +1,17 @@
+    drop table address cascade constraints;
+    drop table bank_info cascade constraints;
+    drop table city cascade constraints;
+    drop table company_info cascade constraints;
+    drop table country cascade constraints;
+    drop table invoice_details cascade constraints;
+    drop table project_info cascade constraints;
+    drop table report_details cascade constraints;
+    drop table role_mst cascade constraints;
+    drop table state cascade constraints;
+    drop table timesheet_details cascade constraints;
+    drop table user_details cascade constraints;
+    drop table user_profile cascade constraints;
+    drop table config_param cascade constraints;
+	drop sequence hibernate_sequence; 
+	drop sequence report_id_sequence;
+	drop sequence user_id_seq;
