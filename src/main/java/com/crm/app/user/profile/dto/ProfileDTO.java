@@ -1,5 +1,7 @@
 package com.crm.app.user.profile.dto;
 
+import java.util.Map;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,11 +19,8 @@ public class ProfileDTO extends BaseDto {
 	private String title;
 	private String gender;
 	private String qualification;
-	private String landmark;
-	private String city;
-	private String country;
+	private String phone;
 	private String state;
-	private String pincode;
 	private String url;
 	private String dob;
 	private long profileId;
@@ -29,6 +28,6 @@ public class ProfileDTO extends BaseDto {
 	private String companyName;
 	private String managerName;
 	private long managerId;
-	
+	private Map<String,String> address;
 	private ProjectDTO project;
 }

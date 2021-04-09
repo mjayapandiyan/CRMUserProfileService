@@ -20,7 +20,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	void updateLoginTime(@Param("loggedInDate") String loggedInDate, @Param("emailId") String emailId);
 	
 	@Modifying(clearAutomatically = true)
-	@Query("update User u set u.image =:image, filename =:filename where u.userId =:userId")
-	int updateUserImage(@Param("image") byte[] image, @Param("filename") String filename, @Param("userId") long userId);
+	@Query("update User u set u.image =:image, filename =:filename, fileType =:fileType where u.userId =:userId")
+	int updateUserImage(@Param("image") byte[] image, @Param("filename") String filename, @Param("fileType") String fileType, @Param("userId") long userId);
 	
 }

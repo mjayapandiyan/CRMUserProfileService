@@ -164,6 +164,7 @@
         dob varchar2(255 char) not null,
         email_id varchar2(255 char) not null,
         filename varchar2(255 char),
+        fileType varchar2(255 char),
         first_name varchar2(255 char) not null,
         gender varchar2(255 char) not null,
         user_image blob,

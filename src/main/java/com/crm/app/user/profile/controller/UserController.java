@@ -1,23 +1,25 @@
 package com.crm.app.user.profile.controller;
 
-import java.io.ByteArrayOutputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.zip.DataFormatException;
-import java.util.zip.Deflater;
-import java.util.zip.Inflater;
+import java.util.stream.Collectors;
 
+import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.ResponseEntity.BodyBuilder;
 import org.springframework.integration.support.MessageBuilder;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -36,6 +38,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.crm.app.user.profile.binding.MailBinding;
 import com.crm.app.user.profile.constants.RoleNames;
+import com.crm.app.user.profile.constants.UserConstant;
+import com.crm.app.user.profile.dto.ApiResonseDto;
 import com.crm.app.user.profile.dto.CityDto;
 import com.crm.app.user.profile.dto.CountryDto;
 import com.crm.app.user.profile.dto.LoginRequestDto;
@@ -49,10 +53,13 @@ import com.crm.app.user.profile.exception.UserInputException;
 import com.crm.app.user.profile.model.Address;
 import com.crm.app.user.profile.model.Project;
 import com.crm.app.user.profile.model.Role;
+import com.crm.app.user.profile.model.State;
 import com.crm.app.user.profile.model.User;
 import com.crm.app.user.profile.model.UserInterfaceConfig;
-import com.crm.app.user.profile.repository.ProfileRepository;
+import com.crm.app.user.profile.repository.CityRepository;
+import com.crm.app.user.profile.repository.CountryRepository;
 import com.crm.app.user.profile.repository.RoleRepository;
+import com.crm.app.user.profile.repository.StateRepository;
 import com.crm.app.user.profile.repository.UserRepository;
 import com.crm.app.user.profile.service.UserService;
 import com.crm.app.user.profile.util.CustomUserDetails;
@@ -79,6 +86,16 @@ public class UserController {
 	private RoleRepository roleRepository;
 	
 	@Autowired
+	private CountryRepository countryRepository;
+
+	@Autowired
+	private StateRepository stateRepository;
+	
+	@Autowired
+	private CityRepository cityRepository;
+
+	
+	@Autowired
 	private PasswordGenerator passwordGenerator;
 
 	@Autowired
@@ -89,6 +106,10 @@ public class UserController {
 	
 	@Autowired
 	private MailBinding mailNotificationBinder;
+	
+	private File imagePath = null;
+	private FileOutputStream fos = null;
+	private BufferedOutputStream bos = null;
 	
 	@PostMapping(value = "/users/auth")
     public ResponseEntity<LoginResponseDto> authenticateUser(@RequestBody LoginRequestDto loginRequest) {
@@ -197,7 +218,7 @@ public class UserController {
     }
 	
 	 @PutMapping("/users/profile/image/upload")
-	 public BodyBuilder uploadImage(@RequestParam("imageFile") MultipartFile file, @RequestParam("userId") long userId) throws IOException {
+	 public ResponseEntity<ApiResonseDto> uploadImage(@RequestParam("imageFile") MultipartFile file, @RequestParam("userId") long userId) throws Exception {
 		 	if(file.isEmpty()) {
 		 		throw new UserInputException("Please upload an Image");
 		 	} else if(!userService.isValidImageType(file.getContentType())){
@@ -206,54 +227,57 @@ public class UserController {
 		 	
 			log.info("Uploaded Image Byte Size - " + file.getBytes().length);
 			log.info("file name : " + file.getOriginalFilename() + "file.getContentType() : " +file.getContentType());
-			byte[] uploadedImage = compressBytes(file.getBytes());
-			String filename = "IMG_"+userId;
-			int count = userService.updateUserImage(uploadedImage, filename, userId);
-			log.info("Image has been uploaded Successfully. upload count : " +count);
-			return ResponseEntity.status(HttpStatus.OK);
+			
+			String filename = userId+".jpg";
+			
+			writeImageToFilePath(file.getBytes(), filename);
+			int count = userService.updateUserImage(file.getBytes(), filename, file.getContentType(), userId);
+			ApiResonseDto response = new ApiResonseDto();
+			if(count > 0) {
+				log.info("Image has been uploaded Successfully. upload count : " +count);
+				response.setMessage("Image has been uploaded Successfully");
+			} else {
+				throw new UserInputException("Image upload failed for unknown reason");
+			}
+			 return new ResponseEntity<ApiResonseDto>(response,HttpStatus.OK);
 		}
 	 
-		// compress the image bytes before storing it in the database
-		public static byte[] compressBytes(byte[] data) {
-			Deflater deflater = new Deflater();
-			deflater.setInput(data);
-			deflater.finish();
-			ByteArrayOutputStream outputStream = new ByteArrayOutputStream(data.length);
-			byte[] buffer = new byte[1024];
-			while (!deflater.finished()) {
-				int count = deflater.deflate(buffer);
-				outputStream.write(buffer, 0, count);
+	 private void writeImageToFilePath(byte[] uploadedImage, String filename) throws Exception {
+		 StringBuilder filePath = new StringBuilder();
+		 try {
+			 imagePath = new File(filePath.append(UserConstant.IMAGE_FILE_PATH)
+					 .append("/")
+					 .append(filename)
+					 .toString());
+			  fos = new FileOutputStream(imagePath);    
+			  bos = new BufferedOutputStream(fos);    
+			  bos.write(uploadedImage);    
+			  bos.flush();    
+			 log.info("Image has been written successfully");
+		 } catch (Exception ex) {
+			 log.error("Exception caught at writeImageToFilePath() " +ex.getMessage());
+		 } finally {
+			 	bos.close();    
+			 	fos.close();   
+		 }
+	}
+
+	 @GetMapping("/users/profile/image/{userId}")
+	 public ApiResonseDto fetchImage(@PathVariable("userId") long userId, HttpServletResponse response) throws Exception {
+		 if(userRepository.findById(userId).isEmpty()) {
+				throw new UserInputException("User Id is does not exist!!");
 			}
-			try {
-				outputStream.close();
-			} catch (IOException e) {
-			}
-			log.info("Compressed Image Byte Size - " + outputStream.toByteArray().length);
-			return outputStream.toByteArray();
+		 ApiResonseDto apiResponse = userService.fetchUserImage(userId);
+		 return apiResponse;
 		}
+	 
+	 
 		
-		// uncompress the image bytes before returning it to the front end application
-		public static byte[] decompressBytes(byte[] data) {
-			Inflater inflater = new Inflater();
-			inflater.setInput(data);
-			ByteArrayOutputStream outputStream = new ByteArrayOutputStream(data.length);
-			byte[] buffer = new byte[1024];
-			try {
-				while (!inflater.finished()) {
-					int count = inflater.inflate(buffer);
-					outputStream.write(buffer, 0, count);
-				}
-				outputStream.close();
-			} catch (IOException ioe) {
-			} catch (DataFormatException e) {
-			}
-			return outputStream.toByteArray();
-		}
 		
 		@GetMapping(value = "/users/profile/{userId}")
 		public ProfileDTO getUserProfile(@PathVariable("userId") long userId) throws Exception {
 			ProfileDTO profile = new ProfileDTO();
-			
+			Map<String,String> address = new HashMap<>();
 			userRepository.findById(userId).map(
 					userOb -> {
 						ProjectDTO project = new ProjectDTO();
@@ -267,11 +291,39 @@ public class UserController {
 						profile.setQualification(userOb.getQualification());
 						profile.setRole(userOb.getRole());
 						profile.setDob(userOb.getDob());
-						profile.setCountry(userOb.getAddress().getCountry());
-						profile.setState(userOb.getAddress().getState());
-						profile.setCity(userOb.getAddress().getCity());
-						profile.setPincode(userOb.getAddress().getPincode());
-						profile.setLandmark(userOb.getAddress().getLandmark());
+						profile.setPhone(userOb.getContactno());
+						address.put("pincode", userOb.getAddress().getPincode());
+						address.put("landmark", userOb.getAddress().getLandmark());
+						address.put("countryId", userOb.getAddress().getCountry());
+						countryRepository.findById(Long.valueOf(address.get("countryId")))
+						.map(
+								
+							k-> { 
+								return address.put("countryName", k.getCountryName());
+								}
+						);
+							stateRepository.fetchStatesByCountry(Long.valueOf(address.get("countryId")))
+									.stream()
+									.filter(k->String.valueOf(k.getStateId()).equals(userOb.getAddress().getState()))
+									.findFirst()
+									.map(
+										v-> {
+										address.put("stateId", String.valueOf(v.getStateId())); 
+										  address.put("stateName", v.getStateName());
+											  v.getCity().stream()
+											  .filter(c-> String.valueOf(userOb.getAddress().getCity()).equalsIgnoreCase(String.valueOf(c.getCityId())))
+											  .findAny()
+											  .map(
+												n-> {
+													address.put("cityId", String.valueOf(n.getCityId()));
+													address.put("cityName", n.getCityName());
+													return address;
+												});
+										  return address;
+										
+										});
+						
+						profile.setAddress(address);
 						profile.setUrl(userOb.getProfile().getUrl());
 						profile.setCompanyName(userOb.getProfile().getCompanyName());
 						profile.setManagerId(userOb.getProfile().getDirectorId());
@@ -294,6 +346,8 @@ public class UserController {
 						
 			return profile;
 		}
+		
+		
 
 
 }

@@ -65,7 +65,6 @@ public class User implements Serializable {
 	private String gender;
 	
 	private String title;
-	
 	@JsonIgnoreProperties
 	private String password;
 	private Timestamp createdAt;
@@ -79,6 +78,7 @@ public class User implements Serializable {
 	@Column(name = "user_image", length = 1000)
 	private byte[] image;
 	private String filename;
+	private String fileType;
 	@Column(name = "ROLE_ID",nullable = false)
     private long roleId;
 	@Column(name = "LOGIN_DATE", unique = true)
