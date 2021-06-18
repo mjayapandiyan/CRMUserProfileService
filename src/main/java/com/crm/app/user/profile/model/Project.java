@@ -1,7 +1,6 @@
 package com.crm.app.user.profile.model;
 
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
@@ -22,7 +21,7 @@ import lombok.Setter;
 @Setter
 
 @Entity
-@Table(name = "PROJECT_INFO")
+@Table(name = "PROJECTS_DETAILS")
 public class Project {
 	
 	@Id
@@ -46,19 +45,13 @@ public class Project {
 	
 	@Column(name="BILLING_AMOUNT_USD")
 	private long billingAmount;
+	private String status;
+	@Column(name="ALLOCATION_TYPE")
+	private String allocationType;
+	private Timestamp createdAt;
+	private String createdBy;
 	
-	@Column(name = "ASSIGNED_FROM")
-	private String assingedFrom;
-	@Column(name = "ASSIGNED_TO")
-	private String assingedTo;
-	@Column(name = "allocation_status")
-	private String allocationStatus;
-	
-	private long allocatedBy;
-	private Timestamp allocatedDate;
-	
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "PROFILE_ID", nullable = false)
-	private Profile profile;
+	private String modifiedBy;
+	private Timestamp updatedAt;
 	
 }

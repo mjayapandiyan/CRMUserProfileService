@@ -1,5 +1,6 @@
 package com.crm.app.user.profile.repository;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -23,4 +24,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 	@Query("update User u set u.image =:image, filename =:filename, fileType =:fileType where u.userId =:userId")
 	int updateUserImage(@Param("image") byte[] image, @Param("filename") String filename, @Param("fileType") String fileType, @Param("userId") long userId);
 	
+	@Query(value = "select user_id_seq.nextval from dual", nativeQuery = true)
+    public Long getNextSequenceNumber();
 }

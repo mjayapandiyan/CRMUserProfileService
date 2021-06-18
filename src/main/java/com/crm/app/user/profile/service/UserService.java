@@ -52,7 +52,7 @@ public class UserService implements UserDetailsService {
 	@Autowired
 	private UserRepository userRepository;
 	
-	@Cacheable(cacheNames = "countryCache", unless ="#result==null" )
+	//@Cacheable(cacheNames = "countryCache", unless ="#result==null" )
 	public List<CountryDto> fetchAllCountries(){
 		List<CountryDto> cntryListResponse = new ArrayList<CountryDto>();
 		CountryDto cntryDto = null;

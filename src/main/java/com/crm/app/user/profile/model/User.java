@@ -1,7 +1,6 @@
 package com.crm.app.user.profile.model;
 
 import java.io.Serializable;
-import java.sql.Blob;
 import java.sql.Timestamp;
 
 import javax.persistence.CascadeType;
@@ -74,6 +73,7 @@ public class User implements Serializable {
 	private Timestamp updatedAt;
 	private String status;
 	private String username;
+
 	@Lob
 	@Column(name = "user_image", length = 1000)
 	private byte[] image;

@@ -28,6 +28,11 @@ public class ProfileDTO extends BaseDto {
 	private String companyName;
 	private String managerName;
 	private long managerId;
+	private String assignedFrom;
+	private String assignedTo;
+	private String allocationStatus;
+	private long allocatedBy;
+	private String allocatedDate;
 	private Map<String,String> address;
 	private ProjectDTO project;
 }

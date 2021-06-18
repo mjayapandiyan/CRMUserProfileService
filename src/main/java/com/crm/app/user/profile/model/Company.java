@@ -28,7 +28,7 @@ public class Company {
 	private String companyName;
 	private String website;
 	@Column(name = "REGISTRATION_NO")
-	private long registrationNo;
+	private String registrationNo;
 	@Column(name = "REGISTRATION_DATE")
 	private Timestamp registrationDate;
 	@Column(name = "GST_PERCENTAGE")

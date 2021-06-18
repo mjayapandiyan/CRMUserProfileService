@@ -13,9 +13,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.http.HttpStatus;
@@ -35,8 +37,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-
-import com.crm.app.user.profile.binding.MailBinding;
+import com.crm.app.user.profile.amqp.MessageSender;
+import com.crm.app.user.profile.amqp.PropertyConfig;
 import com.crm.app.user.profile.constants.RoleNames;
 import com.crm.app.user.profile.constants.UserConstant;
 import com.crm.app.user.profile.dto.ApiResonseDto;
@@ -51,6 +53,7 @@ import com.crm.app.user.profile.dto.StateDto;
 import com.crm.app.user.profile.dto.UIParamDto;
 import com.crm.app.user.profile.exception.UserInputException;
 import com.crm.app.user.profile.model.Address;
+import com.crm.app.user.profile.model.Profile;
 import com.crm.app.user.profile.model.Project;
 import com.crm.app.user.profile.model.Role;
 import com.crm.app.user.profile.model.State;
@@ -58,6 +61,7 @@ import com.crm.app.user.profile.model.User;
 import com.crm.app.user.profile.model.UserInterfaceConfig;
 import com.crm.app.user.profile.repository.CityRepository;
 import com.crm.app.user.profile.repository.CountryRepository;
+import com.crm.app.user.profile.repository.ProfileRepository;
 import com.crm.app.user.profile.repository.RoleRepository;
 import com.crm.app.user.profile.repository.StateRepository;
 import com.crm.app.user.profile.repository.UserRepository;
@@ -73,7 +77,6 @@ import lombok.extern.slf4j.Slf4j;
 @RestController
 @CrossOrigin
 @RequestMapping("/api/v1/")
-@EnableBinding(MailBinding.class)
 public class UserController {
 	
 	@Autowired
@@ -87,6 +90,9 @@ public class UserController {
 	
 	@Autowired
 	private CountryRepository countryRepository;
+	
+	@Autowired
+	private ProfileRepository profileRepository;
 
 	@Autowired
 	private StateRepository stateRepository;
@@ -105,7 +111,13 @@ public class UserController {
 	private JwtTokenUtil jwtTokenUtil;
 	
 	@Autowired
-	private MailBinding mailNotificationBinder;
+	private RabbitTemplate rabbitTemplate;
+	
+	@Autowired
+	private PropertyConfig amqpConfig;
+	
+	@Autowired
+	private MessageSender messageSender;
 	
 	private File imagePath = null;
 	private FileOutputStream fos = null;
@@ -184,19 +196,24 @@ public class UserController {
 		}
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 		CustomUserDetails currentUser = (CustomUserDetails)auth.getPrincipal();
+		
 		Date date= new Date();
 		User user = new User();
+		final Long userIdSequence = userRepository.getNextSequenceNumber();
+		user.setUserId(userIdSequence);
 		user.setTitle(signUpRequest.getTitle());
 		user.setFirstname(signUpRequest.getFirstname());
 		user.setLastname(signUpRequest.getLastname());
 		user.setUsername(signUpRequest.getEmail());
-		user.setDob(signUpRequest.getDob());
 		user.setEmailId(signUpRequest.getEmail());
+		user.setDob(signUpRequest.getDob());
 		user.setContactno(signUpRequest.getContactno());
 		user.setGender(signUpRequest.getGender());
 		user.setCreatedAt(new Timestamp(date.getTime()));
 		user.setCreatedBy(String.valueOf(currentUser.getUserId()));
+		user.setQualification(signUpRequest.getQualification());
 		user.setStatus("Active");
+		user.setRole(signUpRequest.getRole());
 		char[] oneTimeAccessCode = passwordGenerator.generatePassword();
 		String accessCode = new String(oneTimeAccessCode);
 		user.setAccessCode(accessCode);
@@ -207,13 +224,35 @@ public class UserController {
 		address.setState(signUpRequest.getState());
 		address.setPincode(signUpRequest.getZipcode());
 		user.setAddress(address);
+		Profile prof = new Profile();
+		prof.setDirectorId(currentUser.getUserId());
+		prof.setDirectorName(currentUser.getFirstName()+" " +currentUser.getLastName());
+		prof.setIsTerminated("N");
+		prof.setIsTerminationLetterIssued("N");
+		prof.setUserId(userIdSequence);
+		prof.setAllocatedBy(currentUser.getUserId());
+		prof.setAllocationStatus("UNALLOCATED");
+		prof.setAllocatedDate(new Timestamp(date.getTime()));
+		prof.setProjectId(9999);
+		
+		userRepository.findById(currentUser.getUserId()).map(
+				k->{
+					prof.setCompanyId(k.getProfile().getCompanyId());
+					prof.setCompanyName(k.getProfile().getCompanyName());
+					prof.setUrl(k.getProfile().getUrl());
+					return prof;
+				}
+		);
+				
+		user.setProfile(prof);
+		
 		if(currentUser.getRoleId() == RoleNames.ROLE_DIRECTOR.getRoleId()) {
 			user.setRoleId(RoleNames.ROLE_EMPLOYEE.getRoleId());
 		} else {
 			user.setRoleId(RoleNames.ROLE_DIRECTOR.getRoleId());
 		}
 		userService.saveUserDetails(user);
-		mailNotificationBinder.triggerEmailNotification().send(MessageBuilder.withPayload("Test@123").build());
+		messageSender.sendMessage(rabbitTemplate, amqpConfig.getExchange(), amqpConfig.getRoutingKey(), user);
         return new ResponseEntity<>("User Registration Done Successfully", HttpStatus.OK);
     }
 	
@@ -276,22 +315,22 @@ public class UserController {
 		
 		@GetMapping(value = "/users/profile/{userId}")
 		public ProfileDTO getUserProfile(@PathVariable("userId") long userId) throws Exception {
-			ProfileDTO profile = new ProfileDTO();
+			ProfileDTO profiledDto = new ProfileDTO();
 			Map<String,String> address = new HashMap<>();
 			userRepository.findById(userId).map(
 					userOb -> {
 						ProjectDTO project = new ProjectDTO();
-						profile.setFirstname(userOb.getFirstname());
-						profile.setLastname(userOb.getLastname());
-						profile.setEmailId(userOb.getEmailId());
-						profile.setUserId(userOb.getUserId());
-						profile.setStatus(userOb.getStatus());
-						profile.setTitle(userOb.getTitle());
-						profile.setGender(userOb.getGender());
-						profile.setQualification(userOb.getQualification());
-						profile.setRole(userOb.getRole());
-						profile.setDob(userOb.getDob());
-						profile.setPhone(userOb.getContactno());
+						profiledDto.setFirstname(userOb.getFirstname());
+						profiledDto.setLastname(userOb.getLastname());
+						profiledDto.setEmailId(userOb.getEmailId());
+						profiledDto.setUserId(userOb.getUserId());
+						profiledDto.setStatus(userOb.getStatus());
+						profiledDto.setTitle(userOb.getTitle());
+						profiledDto.setGender(userOb.getGender());
+						profiledDto.setQualification(userOb.getQualification());
+						profiledDto.setRole(userOb.getRole());
+						profiledDto.setDob(userOb.getDob());
+						profiledDto.setPhone(userOb.getContactno());
 						address.put("pincode", userOb.getAddress().getPincode());
 						address.put("landmark", userOb.getAddress().getLandmark());
 						address.put("countryId", userOb.getAddress().getCountry());
@@ -323,31 +362,30 @@ public class UserController {
 										
 										});
 						
-						profile.setAddress(address);
-						profile.setUrl(userOb.getProfile().getUrl());
-						profile.setCompanyName(userOb.getProfile().getCompanyName());
-						profile.setManagerId(userOb.getProfile().getDirectorId());
-						profile.setManagerName(userOb.getProfile().getDirectorName());
-						List<Project> projectList = userOb.getProfile().getProject();
-						for(Project p : projectList) {
-							if("Active".equalsIgnoreCase(p.getAllocationStatus())) {
-								project.setAllocationStatus(p.getAllocationStatus());
-								project.setProjectName(p.getProjectName());
-								project.setClientName(p.getClientName());
-								project.setAssingedFrom(p.getAssingedFrom());
-								project.setAssingedTo(p.getAssingedTo());
-								break;
-							}
-						}
-						profile.setProject(project);
+							profiledDto.setAddress(address);
+							profiledDto.setUrl(userOb.getProfile().getUrl());
+							profiledDto.setCompanyName(userOb.getProfile().getCompanyName());
+							profiledDto.setManagerId(userOb.getProfile().getDirectorId());
+							profiledDto.setManagerName(userOb.getProfile().getDirectorName());
+							profiledDto.setAllocationStatus(userOb.getProfile().getAllocationStatus());
+							profiledDto.setAssignedFrom(userOb.getProfile().getAssignedfrom());
+							profiledDto.setAssignedTo(userOb.getProfile().getAssignedTo());
 						
-						return profile;
+							//TODO - Project finding logic
+						return profiledDto;
 						});
 						
-			return profile;
+			return profiledDto;
 		}
 		
 		
-
+@PutMapping("/users/profile/update")
+public ResponseEntity<ApiResonseDto> updateUserProfile(@RequestBody SignUpDto updateRequest,HttpServletRequest request) throws Exception {
+	ApiResonseDto response = new ApiResonseDto();
+	response.setStatusCode(HttpStatus.OK);
+	response.setPath(request.getContextPath());
+	response.setMessage("Your profile information has been updated successfully");
+	return new ResponseEntity<ApiResonseDto>(response, HttpStatus.OK);
+}
 
 }

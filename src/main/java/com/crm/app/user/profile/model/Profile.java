@@ -2,6 +2,7 @@ package com.crm.app.user.profile.model;
 
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Set;
 
 import javax.persistence.CascadeType;
 import javax.persistence.Column;
@@ -10,6 +11,7 @@ import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
 import javax.persistence.OneToMany;
 import javax.persistence.OneToOne;
 import javax.persistence.SequenceGenerator;
@@ -36,22 +38,22 @@ public class Profile {
 	@Column(name = "PROFILE_ID")
 	private long id;
 	
-	@Column(name = "USER_ID", nullable = false)
+	@Column(name = "user_Id", nullable = false)
 	private long userId;
 	
-	@Column(name = "DIRECTOR_NAME", nullable = false)
+	@Column(name = "director_Name", nullable = false)
 	private String directorName;
-	@Column(name = "DIRECTOR_ID", nullable = false)
+	@Column(name = "director_Id", nullable = false)
 	private long directorId;
-	@Column(name = "IS_TERMINATED")
+	@Column(name = "is_Terminated")
 	private String isTerminated;
-	@Column(name = "DATE_OF_EXIT")
+	@Column(name = "date_Of_Exit")
 	private Timestamp dateOfExit;
-	@Column(name = "IS_TERMINATION_LETTER_ISSUED")
+	@Column(name = "isTermination_Letter_Issued")
 	private String isTerminationLetterIssued;
-	@Column(name = "TERMINATION_INITIATED_BY")
+	@Column(name = "termination_Initiated_By")
 	private String terminationInitiatedBy;
-	@Column(name = "TERMINATION_INITIATED_DATE")
+	@Column(name = "termination_Initiated_Date")
 	private Timestamp terminationInitiatedDate;
 
 	private String remarks;
@@ -59,10 +61,21 @@ public class Profile {
 	private long companyId;
 	private String url;
 	
-    @OneToOne(targetEntity = User.class, mappedBy = "profile")
+	@Column(name = "assigned_from")
+	private String assignedfrom;
+	@Column(name = "assigned_to")
+	private String assignedTo;
+	@Column(name = "allocation_status")
+	private String allocationStatus;
+	@Column(name = "allocated_by")
+	private long allocatedBy;
+	@Column(name = "allocated_date")
+	private Timestamp allocatedDate;
+	
+	@OneToOne(targetEntity = User.class, mappedBy = "profile")
     private User user;
-    
-	@OneToMany(mappedBy = "profile", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-	private List<Project> project;
+	
+	@Column(name = "project_Id",nullable = false)
+	private long projectId;
 	
 }
