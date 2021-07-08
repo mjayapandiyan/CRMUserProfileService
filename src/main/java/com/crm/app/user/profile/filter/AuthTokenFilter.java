@@ -8,8 +8,6 @@ import javax.servlet.annotation.WebFilter;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -20,12 +18,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.crm.app.user.profile.service.UserService;
 import com.crm.app.user.profile.util.JwtTokenUtil;
 
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @WebFilter
 public class AuthTokenFilter extends OncePerRequestFilter  {
 	
-	private static final Logger logger = LoggerFactory.getLogger(AuthTokenFilter.class);
-
 	@Autowired
 	private JwtTokenUtil jwtTokenUtil;
 
@@ -46,7 +44,8 @@ public class AuthTokenFilter extends OncePerRequestFilter  {
         			username = jwtTokenUtil.getUsernameFromToken(jwtToken);
         			if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
         				UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
-        				if (jwtTokenUtil.validateToken(jwtToken, userDetails)) {
+        				//sonar fix - using primitive boolean expression
+        				if (Boolean.TRUE.equals(jwtTokenUtil.validateToken(jwtToken, userDetails))) {
         					UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(
         							userDetails, null, userDetails.getAuthorities());
         							usernamePasswordAuthenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
@@ -57,7 +56,7 @@ public class AuthTokenFilter extends OncePerRequestFilter  {
         	}
             
         } catch (Exception e) {
-            logger.error("Can not set user authentication -> ", e);
+        	log.error("Can not set user authentication -> ", e);
         }
 
         filterChain.doFilter(request, response);

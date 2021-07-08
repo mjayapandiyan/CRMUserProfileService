@@ -26,5 +26,8 @@ public class PropertyConfig {
 
 	@Value("${crm.mail.service.routing.key}")
 	private String routingKey;
+	
+	@Value("${crm.app.user.image.upload.path}")
+	private String imageFilePath;
 
 }

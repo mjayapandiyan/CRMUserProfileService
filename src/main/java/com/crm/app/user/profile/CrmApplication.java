@@ -29,7 +29,7 @@ public class CrmApplication implements ApplicationRunner {
 	@Override
 	public void run(ApplicationArguments args) throws Exception {
 		try {
-			log.info("populateDataService instance created and DB script execution done: " +populateDataService.getClass());	
+			log.info("populateDataService instance created and DB script execution done: " +populateDataService.getClass());
 		}catch (Exception e) {
 			log.error("Exception Occured in ApplicationRunner : " +e.getMessage());
 		}

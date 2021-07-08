@@ -21,8 +21,7 @@ public class AuthenticationListener implements ApplicationListener<Authenticatio
 	  @Override
 	  public void onApplicationEvent(final AuthenticationSuccessEvent event){
 		  
-		  AuthenticationSuccessEvent successEvent = (AuthenticationSuccessEvent) event;
-	        CustomUserDetails userDetails = (CustomUserDetails) successEvent.getAuthentication().getPrincipal();
+	        CustomUserDetails userDetails = (CustomUserDetails) event.getAuthentication().getPrincipal();
 	        userService.updateLoginTime(usrUtil.getCurrentTimeStamp(), userDetails.getEmailId());
 	  }
 

@@ -15,17 +15,17 @@ import lombok.extern.slf4j.Slf4j;
 @Aspect
 @Component
 public class LoggingAspect {
-	
-	@Pointcut("execution(* *.*(..))")
-    protected void allMethod() {
-    }
  
     @Pointcut("execution(public * *(..))")
     protected void loggingPublicOperation() {
+    	//logging only public methods 
     }
+    
+   
  
 	@Pointcut("execution(* *.*(..))")
 	protected void loggingAllOperation() {
+		//logging all methods
 	}
 
 	@Pointcut("within(@org.springframework.stereotype.Repository *)"

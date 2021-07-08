@@ -27,14 +27,14 @@ public class GlobalExceptionHandler {
         response.setMessage(e.getLocalizedMessage());
         response.setStatusCode(HttpStatus.EXPECTATION_FAILED);
         response.setPath(request.getContextPath());
-        return new ResponseEntity<ErrorDto>(response, HttpStatus.EXPECTATION_FAILED);
+        return new ResponseEntity<>(response, HttpStatus.EXPECTATION_FAILED);
 	  }
 	
 	@ExceptionHandler(value = MethodArgumentNotValidException.class) 
 	@ResponseStatus(HttpStatus.BAD_REQUEST)
 	public Map<String, String> handleBadInputRequestException(MethodArgumentNotValidException e) {
 		Map<String, String> errors = new HashMap<>();
-		 e.getBindingResult().getAllErrors().forEach((error) -> {
+		 e.getBindingResult().getAllErrors().forEach(error -> {
 		        String fieldName = ((FieldError) error).getField();
 		        String errorMessage = error.getDefaultMessage();
 		        errors.put(fieldName, errorMessage);

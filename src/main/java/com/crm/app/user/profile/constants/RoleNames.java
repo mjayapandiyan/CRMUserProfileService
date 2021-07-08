@@ -17,16 +17,4 @@ public enum RoleNames {
 		return roleId;
 	}
 	
-	
-	
-	/*
-	 * admin ("ROLE_ADMIN"), director ("ROLE_DIRECTOR"), employee ("ROLE_EMPLOYEE"),
-	 * guest ("ROLE_GUEST");
-	 * 
-	 * private final String name;
-	 * 
-	 * private RoleNames(String s) { name = s; }
-	 * 
-	 * public String getRoleName() { return this.name; }
-	 */
 }

@@ -10,7 +10,6 @@ public class UserUtil {
 
 	public String getCurrentTimeStamp() {
 		SimpleDateFormat sfdate = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss a");
-		String logginTime = sfdate.format(new Date()).toString();
-		return logginTime;
+		return sfdate.format(new Date());
 	}
 }

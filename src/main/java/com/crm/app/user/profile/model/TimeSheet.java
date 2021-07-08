@@ -1,8 +1,5 @@
 package com.crm.app.user.profile.model;
 
-import java.sql.Blob;
-import java.sql.Timestamp;
-
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
@@ -40,13 +37,7 @@ public class TimeSheet {
 	private String leaveDate;
 	@Column(name="LEAVE_REASON")
 	private String leave;
-	@Column(name="TIMESHEET_DATE")
-	private String TimesheetDate;
-
 	
-
-	/*
-	 * TIMESHEET_ID (PK) USER_ID (fk), user_name PROJECT_CODE; PROJECT_NAME;
-	 * UTILIZATION_HOURS; LEAVE_TAKEN_DATE LEAVE_REMARKS TIMESHEET_DATE
-	 */
+	@Column(name="TIMESHEET_DATE")
+	private String timesheetDate;
 }

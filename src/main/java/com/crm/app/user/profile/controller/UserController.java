@@ -11,7 +11,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -19,10 +18,8 @@ import javax.validation.Valid;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.integration.support.MessageBuilder;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -37,26 +34,25 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+
 import com.crm.app.user.profile.amqp.MessageSender;
 import com.crm.app.user.profile.amqp.PropertyConfig;
 import com.crm.app.user.profile.constants.RoleNames;
-import com.crm.app.user.profile.constants.UserConstant;
 import com.crm.app.user.profile.dto.ApiResonseDto;
 import com.crm.app.user.profile.dto.CityDto;
 import com.crm.app.user.profile.dto.CountryDto;
 import com.crm.app.user.profile.dto.LoginRequestDto;
 import com.crm.app.user.profile.dto.LoginResponseDto;
+import com.crm.app.user.profile.dto.MailDto;
 import com.crm.app.user.profile.dto.ProfileDTO;
-import com.crm.app.user.profile.dto.ProjectDTO;
+import com.crm.app.user.profile.dto.ResetFormDto;
 import com.crm.app.user.profile.dto.SignUpDto;
 import com.crm.app.user.profile.dto.StateDto;
 import com.crm.app.user.profile.dto.UIParamDto;
 import com.crm.app.user.profile.exception.UserInputException;
 import com.crm.app.user.profile.model.Address;
 import com.crm.app.user.profile.model.Profile;
-import com.crm.app.user.profile.model.Project;
 import com.crm.app.user.profile.model.Role;
-import com.crm.app.user.profile.model.State;
 import com.crm.app.user.profile.model.User;
 import com.crm.app.user.profile.model.UserInterfaceConfig;
 import com.crm.app.user.profile.repository.CityRepository;
@@ -114,14 +110,15 @@ public class UserController {
 	private RabbitTemplate rabbitTemplate;
 	
 	@Autowired
-	private PropertyConfig amqpConfig;
+	private PropertyConfig propertyConfig;
 	
 	@Autowired
 	private MessageSender messageSender;
 	
-	private File imagePath = null;
-	private FileOutputStream fos = null;
-	private BufferedOutputStream bos = null;
+	@Autowired
+	private MailDto mailDto;
+	
+	private static final String COUNTRY_ID = "countryId";
 	
 	@PostMapping(value = "/users/auth")
     public ResponseEntity<LoginResponseDto> authenticateUser(@RequestBody LoginRequestDto loginRequest) {
@@ -131,7 +128,7 @@ public class UserController {
                         loginRequest.getPassword()
                 )
         );
-		
+		log.info("Is User Authenticated: " +authentication.isAuthenticated());
 		final CustomUserDetails userDetails =  (CustomUserDetails) userService.loadUserByUsername(loginRequest.getUsername());
 		final String token = jwtTokenUtil.generateToken(userDetails);
 		LoginResponseDto response = new LoginResponseDto();
@@ -149,7 +146,7 @@ public class UserController {
 		if(roleOb.isPresent()) {
 			response.setRole(roleOb.get().getRoleName());
 			List<UserInterfaceConfig> userparamOb = roleOb.get().getConfig();
-			List<UIParamDto> uiparamList = new ArrayList<UIParamDto>();
+			List<UIParamDto> uiparamList = new ArrayList<>();
 			for(UserInterfaceConfig param : userparamOb) {
 				UIParamDto uiparam = new UIParamDto();
 				if(param.getComponent().equalsIgnoreCase("Menu") && param.getStatus().equalsIgnoreCase("Active")) {
@@ -167,31 +164,31 @@ public class UserController {
     }
 	
 	@GetMapping(value = "/welcome")
-    public ResponseEntity<?> welcome() {
+    public ResponseEntity<String> welcome() {
         return new ResponseEntity<>("Welcome to CRM Application", HttpStatus.OK);
     }
 	
 	@GetMapping(value = "/location/countries")
-    public ResponseEntity<?> fetchAllCountries() {
+    public ResponseEntity<List<CountryDto>> fetchAllCountries() {
 		List<CountryDto> responseList = userService.fetchAllCountries();
         return new ResponseEntity<>(responseList, HttpStatus.OK);
     }
 	
 	@GetMapping(value = "/location/state")
-    public ResponseEntity<?> fetchStateByCountry(@RequestParam("countryId") long countryId) {
+    public ResponseEntity<List<StateDto>> fetchStateByCountry(@RequestParam("countryId") long countryId) {
 		List<StateDto> stateDtoResponse= userService.fetchStatesByCountry(countryId);
         return new ResponseEntity<>(stateDtoResponse, HttpStatus.OK);
     }
 	
 	@GetMapping(value = "/location/city")
-    public ResponseEntity<?> fetchStateByCity(@RequestParam("stateId") long stateId) {
+    public ResponseEntity<List<CityDto>> fetchStateByCity(@RequestParam("stateId") long stateId) {
 		List<CityDto> cityDtoResponse = userService.fetchCityByState(stateId);
         return new ResponseEntity<>(cityDtoResponse, HttpStatus.OK);
     }
 	
 	@PostMapping(value = "/users/associate/onboard")
-    public ResponseEntity<?> userSignUp(@Valid @RequestBody SignUpDto signUpRequest) throws UserInputException{
-		if(!userRepository.findByEmailId(signUpRequest.getEmail()).isEmpty()) {
+    public ResponseEntity<String> userSignUp(@Valid @RequestBody SignUpDto signUpRequest) throws UserInputException{
+		if(userRepository.findByEmailId(signUpRequest.getEmail()).isPresent()) {
 			throw new UserInputException("Email Id already exist!!");
 		}
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -252,12 +249,23 @@ public class UserController {
 			user.setRoleId(RoleNames.ROLE_DIRECTOR.getRoleId());
 		}
 		userService.saveUserDetails(user);
-		messageSender.sendMessage(rabbitTemplate, amqpConfig.getExchange(), amqpConfig.getRoutingKey(), user);
-        return new ResponseEntity<>("User Registration Done Successfully", HttpStatus.OK);
+		String response = sendEmailNotification(user);
+        return new ResponseEntity<>("User Registration Done Successfully. "+response, HttpStatus.OK);
     }
 	
-	 @PutMapping("/users/profile/image/upload")
-	 public ResponseEntity<ApiResonseDto> uploadImage(@RequestParam("imageFile") MultipartFile file, @RequestParam("userId") long userId) throws Exception {
+	 private String sendEmailNotification(User user) {
+		 mailDto.setAccessCode(user.getAccessCode());
+		 mailDto.setCreatedDate(String.valueOf(user.getCreatedAt()));
+		 mailDto.setMailId(user.getEmailId());
+		 mailDto.setFirstname(user.getFirstname());
+		 mailDto.setLastname(user.getLastname());
+		 mailDto.setMessage("New Associate Registration Confirmation - CRM Web");
+		 messageSender.sendMessage(rabbitTemplate, propertyConfig.getExchange(), propertyConfig.getRoutingKey(), mailDto);
+		 return "An E-mail has been triggerd to the associate";
+	}
+
+	@PutMapping("/users/profile/image/upload")
+	 public ResponseEntity<ApiResonseDto> uploadImage(@RequestParam("imageFile") MultipartFile file, @RequestParam("userId") long userId) throws IOException {
 		 	if(file.isEmpty()) {
 		 		throw new UserInputException("Please upload an Image");
 		 	} else if(!userService.isValidImageType(file.getContentType())){
@@ -278,48 +286,43 @@ public class UserController {
 			} else {
 				throw new UserInputException("Image upload failed for unknown reason");
 			}
-			 return new ResponseEntity<ApiResonseDto>(response,HttpStatus.OK);
+			 return new ResponseEntity<>(response,HttpStatus.OK);
 		}
 	 
-	 private void writeImageToFilePath(byte[] uploadedImage, String filename) throws Exception {
+	private void writeImageToFilePath(byte[] uploadedImage, String filename) {
 		 StringBuilder filePath = new StringBuilder();
-		 try {
-			 imagePath = new File(filePath.append(UserConstant.IMAGE_FILE_PATH)
-					 .append("/")
-					 .append(filename)
-					 .toString());
-			  fos = new FileOutputStream(imagePath);    
-			  bos = new BufferedOutputStream(fos);    
-			  bos.write(uploadedImage);    
-			  bos.flush();    
+		 try (
+				 FileOutputStream fileOutputStream = new FileOutputStream(new File(filePath.append(propertyConfig.getImageFilePath())
+				 .append("/")
+				 .append(filename)
+				 .toString()));
+				 BufferedOutputStream bos = new BufferedOutputStream(fileOutputStream)){
+			
+			 bos.write(uploadedImage);    
+			 bos.flush();  
 			 log.info("Image has been written successfully");
 		 } catch (Exception ex) {
 			 log.error("Exception caught at writeImageToFilePath() " +ex.getMessage());
-		 } finally {
-			 	bos.close();    
-			 	fos.close();   
-		 }
+		 }    
 	}
 
 	 @GetMapping("/users/profile/image/{userId}")
-	 public ApiResonseDto fetchImage(@PathVariable("userId") long userId, HttpServletResponse response) throws Exception {
-		 if(userRepository.findById(userId).isEmpty()) {
+	 public ApiResonseDto fetchImage(@PathVariable("userId") long userId, HttpServletResponse response) throws UserInputException {
+		 if(!userRepository.findById(userId).isPresent()) {
 				throw new UserInputException("User Id is does not exist!!");
 			}
-		 ApiResonseDto apiResponse = userService.fetchUserImage(userId);
-		 return apiResponse;
+		 return userService.fetchUserImage(userId);
 		}
 	 
 	 
 		
 		
 		@GetMapping(value = "/users/profile/{userId}")
-		public ProfileDTO getUserProfile(@PathVariable("userId") long userId) throws Exception {
+		public ProfileDTO getUserProfile(@PathVariable("userId") long userId) {
 			ProfileDTO profiledDto = new ProfileDTO();
 			Map<String,String> address = new HashMap<>();
 			userRepository.findById(userId).map(
 					userOb -> {
-						ProjectDTO project = new ProjectDTO();
 						profiledDto.setFirstname(userOb.getFirstname());
 						profiledDto.setLastname(userOb.getLastname());
 						profiledDto.setEmailId(userOb.getEmailId());
@@ -333,15 +336,12 @@ public class UserController {
 						profiledDto.setPhone(userOb.getContactno());
 						address.put("pincode", userOb.getAddress().getPincode());
 						address.put("landmark", userOb.getAddress().getLandmark());
-						address.put("countryId", userOb.getAddress().getCountry());
-						countryRepository.findById(Long.valueOf(address.get("countryId")))
+						address.put(COUNTRY_ID, userOb.getAddress().getCountry());
+						countryRepository.findById(Long.valueOf(address.get(COUNTRY_ID)))
 						.map(
-								
-							k-> { 
-								return address.put("countryName", k.getCountryName());
-								}
+							k-> address.put("countryName", k.getCountryName())
 						);
-							stateRepository.fetchStatesByCountry(Long.valueOf(address.get("countryId")))
+							stateRepository.fetchStatesByCountry(Long.valueOf(address.get(COUNTRY_ID)))
 									.stream()
 									.filter(k->String.valueOf(k.getStateId()).equals(userOb.getAddress().getState()))
 									.findFirst()
@@ -380,12 +380,24 @@ public class UserController {
 		
 		
 @PutMapping("/users/profile/update")
-public ResponseEntity<ApiResonseDto> updateUserProfile(@RequestBody SignUpDto updateRequest,HttpServletRequest request) throws Exception {
+public ResponseEntity<ApiResonseDto> updateUserProfile(@RequestBody SignUpDto updateRequest,HttpServletRequest request) {
 	ApiResonseDto response = new ApiResonseDto();
 	response.setStatusCode(HttpStatus.OK);
 	response.setPath(request.getContextPath());
 	response.setMessage("Your profile information has been updated successfully");
-	return new ResponseEntity<ApiResonseDto>(response, HttpStatus.OK);
+	return new ResponseEntity<>(response, HttpStatus.OK);
+}
+
+@PutMapping("/users/auth/pwd/reset")
+public ResponseEntity<ApiResonseDto> passwordReset(@RequestBody ResetFormDto resetForm,HttpServletRequest request) {
+	
+	int rowsAffected = userService.resetPassword(resetForm.getMailId(), String.valueOf(resetForm.getPassword()), String.valueOf(resetForm.getAccessCode()));
+	log.info("No of rows updated : "+rowsAffected);
+	ApiResonseDto response = new ApiResonseDto();
+	response.setStatusCode(HttpStatus.OK);
+	response.setPath(request.getContextPath());
+	response.setMessage("Password has been reset successfully");
+	return new ResponseEntity<>(response, HttpStatus.OK);
 }
 
 }

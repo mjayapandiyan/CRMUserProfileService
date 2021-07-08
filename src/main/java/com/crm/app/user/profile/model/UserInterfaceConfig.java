@@ -1,5 +1,6 @@
 package com.crm.app.user.profile.model;
 
+import java.io.Serializable;
 import java.sql.Timestamp;
 
 import javax.persistence.CascadeType;
@@ -24,8 +25,10 @@ import lombok.Setter;
 @Entity
 @Table(name = "CONFIG_PARAM")
 
-public class UserInterfaceConfig {
+public class UserInterfaceConfig implements Serializable{
 
+	private static final long serialVersionUID = 1L;
+	
 	@Id
 	@Column(name = "CONFIG_ID")
 	private long configId;

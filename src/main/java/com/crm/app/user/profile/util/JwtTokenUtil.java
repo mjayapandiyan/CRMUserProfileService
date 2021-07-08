@@ -18,7 +18,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 public class JwtTokenUtil implements Serializable {
 
 	private static final long serialVersionUID = -3240792085736946346L;
-	public static final long JWT_TOKEN_VALIDITY = 5 * 60 * 60;
+	private static final long JWT_TOKEN_VALIDITY = 5 * 60 * 60;
 	
 	@Value("${crm.app.security.jwt.secret.key}")
 	private String secret;
