@@ -69,7 +69,6 @@ import com.crm.app.user.profile.util.PasswordGenerator;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-@SuppressWarnings("deprecation")
 @RestController
 @CrossOrigin
 @RequestMapping("/api/v1/")

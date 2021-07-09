@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
@@ -25,7 +26,6 @@ import com.crm.app.user.profile.dto.CityDto;
 import com.crm.app.user.profile.dto.CountryDto;
 import com.crm.app.user.profile.dto.StateDto;
 import com.crm.app.user.profile.model.City;
-import com.crm.app.user.profile.model.Country;
 import com.crm.app.user.profile.model.State;
 import com.crm.app.user.profile.model.User;
 import com.crm.app.user.profile.repository.CityRepository;
@@ -51,69 +51,57 @@ public class UserService implements UserDetailsService {
 	
 	@Cacheable(cacheNames = "countryCache", unless ="#result==null" )
 	public List<CountryDto> fetchAllCountries(){
-		List<CountryDto> cntryListResponse = new ArrayList<>();
-		CountryDto cntryDto = null;
-		try {
-			List<Country> countryList = countryRepo.findAll();
-			for (Country c : countryList) {
-					cntryDto = new CountryDto();
-					cntryDto.setCountryName(c.getCountryName());
-					cntryDto.setCountryId(c.getCountryId());
-					cntryListResponse.add(cntryDto);
-				
-			}
-			return cntryListResponse;
-		}catch(Exception e) {
-			log.error("Exception Occured in fetchAllCountries(): "+e.getMessage());
-		}
-	
-		return cntryListResponse;
+			return countryRepo.findAll().stream().map(
+					k->{
+						CountryDto cntryDto = new CountryDto();
+						cntryDto.setCountryName(k.getCountryName());
+						cntryDto.setCountryId(k.getCountryId());
+						return cntryDto;
+					}).collect(Collectors.toList());
 	}
 	
 	@Cacheable(cacheNames = "countryCache",key="#countryId",unless ="#result==null")
 	public List<StateDto> fetchStatesByCountry(long countryId){
-		List<StateDto> stateListResponse = new ArrayList<>();
-		StateDto stateDto = null;
-		try {
-			List<State> stateList = stateRepo.fetchStatesByCountry(countryId);
-			for (State s : stateList) {
-				stateDto = new StateDto();
-				stateDto.setStateId(s.getStateId());
-				stateDto.setStateName(s.getStateName());
-				stateListResponse.add(stateDto);
+			Optional<List<State>> stateDtoList = Optional.ofNullable(stateRepo.fetchStatesByCountry(countryId));
+			if(stateDtoList.isPresent()) {
+				return stateDtoList
+				.get()
+				.stream()
+				.map(
+						s->{
+							StateDto stateDto = new StateDto();
+							stateDto.setStateId(s.getStateId());
+							stateDto.setStateName(s.getStateName());
+							return stateDto;
+						})
+				.collect(Collectors.toList());
 			}
-			return stateListResponse;
-		}catch(Exception e) {
-			log.error("Exception Occured in fetchStatesByCountry(): "+e.getMessage());
-		}
-	
-		return stateListResponse;
+			return new ArrayList<>();
 	}
 	
 		@Cacheable(cacheNames = "countryCache",key="#stateId",unless ="#result==null")
 		public List<CityDto> fetchCityByState(long stateId){
-			List<CityDto> cityListResponse = new ArrayList<>();
-			CityDto cityDto = null;
-			try {
-				List<City> cityList = cityRepo.findCities(stateId);
-				for (City cty : cityList) {
-					cityDto = new CityDto();
-					cityDto.setCityId(cty.getCityId());
-					cityDto.setCityName(cty.getCityName());
-					cityListResponse.add(cityDto);
-				}
-				return cityListResponse;
-			}catch(Exception e) {
-				log.error("Exception Occured in fetchCityByState(): "+e.getMessage());
+			Optional<List<City>> cityDtoList = Optional.ofNullable(cityRepo.findCities(stateId));
+			if(cityDtoList.isPresent()) {
+				return cityDtoList
+				.get()
+				.stream()
+				.map(
+						c->{
+							CityDto cityDto = new CityDto();
+							cityDto.setCityId(c.getCityId());
+							cityDto.setCityName(c.getCityName());
+							
+							return cityDto;
+						})
+				.collect(Collectors.toList());
 			}
-		
-			return cityListResponse;
+			return new ArrayList<>();
 		}
 
 		@Override
 	    @Transactional
-	    public UserDetails loadUserByUsername(String username)
-	            throws UsernameNotFoundException {
+	    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
 	    	
 	        User user = null;
 			try {
