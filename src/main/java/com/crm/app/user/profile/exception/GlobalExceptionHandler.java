@@ -1,5 +1,6 @@
 package com.crm.app.user.profile.exception;
 
+import java.time.ZonedDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -43,12 +44,13 @@ public class GlobalExceptionHandler {
 		 return errors;
 	}
 
-	@ExceptionHandler(value = UserInputException.class)
-	public ResponseEntity<ErrorDto> handleUserInputException(UserInputException e, WebRequest request) {
+	@ExceptionHandler(value = InvalidRecordException.class)
+	public ResponseEntity<ErrorDto> handleUserInputException(InvalidRecordException e, WebRequest request) {
 		ErrorDto response = new ErrorDto();
         response.setMessage(e.getLocalizedMessage());
         response.setStatusCode(HttpStatus.BAD_REQUEST);
         response.setPath(request.getContextPath());
+        response.setTimeStamp(ZonedDateTime.now());
 		return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
 	}
 

@@ -1,5 +1,7 @@
 package com.crm.app.user.profile.dto;
 
+import java.time.ZonedDateTime;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
@@ -21,4 +23,5 @@ public class ErrorDto {
 	private String message;
 	private String path;
 	private HttpStatus statusCode;
+	private ZonedDateTime timeStamp;
 }

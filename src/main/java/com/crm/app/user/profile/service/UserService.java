@@ -25,6 +25,7 @@ import com.crm.app.user.profile.dto.ApiResonseDto;
 import com.crm.app.user.profile.dto.CityDto;
 import com.crm.app.user.profile.dto.CountryDto;
 import com.crm.app.user.profile.dto.StateDto;
+import com.crm.app.user.profile.exception.InvalidRecordException;
 import com.crm.app.user.profile.model.City;
 import com.crm.app.user.profile.model.State;
 import com.crm.app.user.profile.model.User;
@@ -61,60 +62,52 @@ public class UserService implements UserDetailsService {
 	}
 	
 	@Cacheable(cacheNames = "countryCache",key="#countryId",unless ="#result==null")
-	public List<StateDto> fetchStatesByCountry(long countryId){
-			Optional<List<State>> stateDtoList = Optional.ofNullable(stateRepo.fetchStatesByCountry(countryId));
-			if(stateDtoList.isPresent()) {
-				return stateDtoList
-				.get()
-				.stream()
-				.map(
-						s->{
-							StateDto stateDto = new StateDto();
-							stateDto.setStateId(s.getStateId());
-							stateDto.setStateName(s.getStateName());
-							return stateDto;
-						})
-				.collect(Collectors.toList());
-			}
-			return new ArrayList<>();
+	public List<StateDto> fetchStatesByCountry(long countryId) {
+		List<StateDto> stateList = new ArrayList<>();
+		Optional<List<State>> stateDtoList = Optional.ofNullable(stateRepo.fetchStatesByCountry(countryId));
+		if (stateDtoList.isPresent()) {
+			stateList = stateDtoList.get().stream().map(s -> {
+				StateDto stateDto = new StateDto();
+				stateDto.setStateId(s.getStateId());
+				stateDto.setStateName(s.getStateName());
+				return stateDto;
+			}).collect(Collectors.toList());
+		}
+		return stateList;
 	}
 	
-		@Cacheable(cacheNames = "countryCache",key="#stateId",unless ="#result==null")
-		public List<CityDto> fetchCityByState(long stateId){
-			Optional<List<City>> cityDtoList = Optional.ofNullable(cityRepo.findCities(stateId));
-			if(cityDtoList.isPresent()) {
-				return cityDtoList
-				.get()
-				.stream()
-				.map(
-						c->{
-							CityDto cityDto = new CityDto();
-							cityDto.setCityId(c.getCityId());
-							cityDto.setCityName(c.getCityName());
-							
-							return cityDto;
-						})
-				.collect(Collectors.toList());
-			}
-			return new ArrayList<>();
+	@Cacheable(cacheNames = "countryCache", key = "#stateId", unless = "#result==null")
+	public List<CityDto> fetchCityByState(long stateId) throws Exception{
+		List<CityDto> cityList = new ArrayList<>();
+		List<City> cityDtoList = cityRepo.findCities(stateId);
+		if(!cityDtoList.isEmpty()) {
+			cityDtoList.forEach(c -> {
+				CityDto cityDto = new CityDto();
+				cityDto.setCityId(c.getCityId());
+				cityDto.setCityName(c.getCityName());
+				cityList.add(cityDto);
+			});
+			return cityList;
+		} else {
+			throw new InvalidRecordException("State Id does not exist");
+		}
+		
+	}
+
+	@Override
+	@Transactional
+	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+
+		User user = null;
+		try {
+			user = userRepository.findByUsername(username).orElseThrow(
+					() -> new UsernameNotFoundException("User Not Found with -> username or email : " + username));
+		} catch (Exception e) {
+			log.error("Exception occured: " + e.getMessage());
 		}
 
-		@Override
-	    @Transactional
-	    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-	    	
-	        User user = null;
-			try {
-				user =  userRepository.findByUsername(username)
-						.orElseThrow (
-										() -> new UsernameNotFoundException("User Not Found with -> username or email : " + username)
-									);
-			} catch (Exception e) {
-				log.error("Exception occured: " +e.getMessage());
-			}
-
-	        return CustomUserDetails.build(user);
-	    }
+		return CustomUserDetails.build(user);
+	}
 		
 		@Transactional
 		public String saveUserDetails(User user) {

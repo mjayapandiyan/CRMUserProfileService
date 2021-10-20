@@ -49,7 +49,7 @@ import com.crm.app.user.profile.dto.ResetFormDto;
 import com.crm.app.user.profile.dto.SignUpDto;
 import com.crm.app.user.profile.dto.StateDto;
 import com.crm.app.user.profile.dto.UIParamDto;
-import com.crm.app.user.profile.exception.UserInputException;
+import com.crm.app.user.profile.exception.InvalidRecordException;
 import com.crm.app.user.profile.model.Address;
 import com.crm.app.user.profile.model.Profile;
 import com.crm.app.user.profile.model.Role;
@@ -180,15 +180,16 @@ public class UserController {
     }
 	
 	@GetMapping(value = "/location/city")
-    public ResponseEntity<List<CityDto>> fetchStateByCity(@RequestParam("stateId") long stateId) {
-		List<CityDto> cityDtoResponse = userService.fetchCityByState(stateId);
-        return new ResponseEntity<>(cityDtoResponse, HttpStatus.OK);
+    public ResponseEntity<List<CityDto>> fetchStateByCity(@RequestParam("stateId") long stateId) throws Exception {
+        return new ResponseEntity<>(Optional.of(userService.fetchCityByState(stateId))
+        		.orElseThrow(()-> new InvalidRecordException("City name is not exist")), 
+        		HttpStatus.OK);
     }
 	
 	@PostMapping(value = "/users/associate/onboard")
-    public ResponseEntity<String> userSignUp(@Valid @RequestBody SignUpDto signUpRequest) throws UserInputException{
+    public ResponseEntity<String> userSignUp(@Valid @RequestBody SignUpDto signUpRequest) throws InvalidRecordException{
 		if(userRepository.findByEmailId(signUpRequest.getEmail()).isPresent()) {
-			throw new UserInputException("Email Id already exist!!");
+			throw new InvalidRecordException("Email Id already exist!!");
 		}
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 		CustomUserDetails currentUser = (CustomUserDetails)auth.getPrincipal();
@@ -266,9 +267,9 @@ public class UserController {
 	@PutMapping("/users/profile/image/upload")
 	 public ResponseEntity<ApiResonseDto> uploadImage(@RequestParam("imageFile") MultipartFile file, @RequestParam("userId") long userId) throws IOException {
 		 	if(file.isEmpty()) {
-		 		throw new UserInputException("Please upload an Image");
+		 		throw new InvalidRecordException("Please upload an Image");
 		 	} else if(!userService.isValidImageType(file.getContentType())){
-		 		throw new UserInputException("Only .png or .jpeg types are allowed");
+		 		throw new InvalidRecordException("Only .png or .jpeg types are allowed");
 		 	}
 		 	
 			log.info("Uploaded Image Byte Size - " + file.getBytes().length);
@@ -283,7 +284,7 @@ public class UserController {
 				log.info("Image has been uploaded Successfully. upload count : " +count);
 				response.setMessage("Image has been uploaded Successfully");
 			} else {
-				throw new UserInputException("Image upload failed for unknown reason");
+				throw new InvalidRecordException("Image upload failed for unknown reason");
 			}
 			 return new ResponseEntity<>(response,HttpStatus.OK);
 		}
@@ -306,18 +307,15 @@ public class UserController {
 	}
 
 	 @GetMapping("/users/profile/image/{userId}")
-	 public ApiResonseDto fetchImage(@PathVariable("userId") long userId, HttpServletResponse response) throws UserInputException {
+	 public ApiResonseDto fetchImage(@PathVariable("userId") long userId, HttpServletResponse response) throws InvalidRecordException {
 		 if(!userRepository.findById(userId).isPresent()) {
-				throw new UserInputException("User Id is does not exist!!");
+				throw new InvalidRecordException("User Id is does not exist!!");
 			}
 		 return userService.fetchUserImage(userId);
 		}
 	 
-	 
-		
-		
 		@GetMapping(value = "/users/profile/{userId}")
-		public ProfileDTO getUserProfile(@PathVariable("userId") long userId) {
+		public ProfileDTO getUserProfile(@PathVariable("userId") long userId) throws InvalidRecordException{
 			ProfileDTO profiledDto = new ProfileDTO();
 			Map<String,String> address = new HashMap<>();
 			userRepository.findById(userId).map(
@@ -372,7 +370,7 @@ public class UserController {
 						
 							//TODO - Project finding logic
 						return profiledDto;
-						});
+						}).orElseThrow(() -> new InvalidRecordException("User Id is does not exist!!"));
 						
 			return profiledDto;
 		}
