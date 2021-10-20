@@ -22,7 +22,6 @@ import com.crm.app.user.profile.service.UserService;
 import com.crm.app.user.profile.util.AuthEntryPointJwt;
 import com.crm.app.user.profile.util.JwtTokenUtil;
 
-
 @RunWith(SpringJUnit4ClassRunner.class)
 @WebMvcTest(controllers = UserController.class)
 class UserControllerTest {
